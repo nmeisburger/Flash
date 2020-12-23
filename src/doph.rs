@@ -22,6 +22,7 @@ struct DOPH {
 impl DOPH {
   pub fn new(l: usize, k: usize, rp: HashType) -> DOPH {
     let num_hashes = k * l;
+
     let mut log_num_hash = 1;
     while log_num_hash * 2 < (num_hashes as HashType) {
       log_num_hash *= 2;
