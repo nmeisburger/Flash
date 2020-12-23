@@ -3,8 +3,8 @@ use crate::heap_array::HeapAllocatedArray;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 
-type IDType = u32;
-type HashType = u32;
+pub type IDType = u32;
+pub type HashType = u32;
 
 pub struct LSH {
   data: HeapAllocatedArray<IDType>,

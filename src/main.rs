@@ -7,4 +7,6 @@ mod thread_pool;
 
 mod reader;
 
+mod doph;
+
 fn main() {}

@@ -173,6 +173,12 @@ where
     }
     return h;
   }
+
+  pub fn fill(&mut self, val: T) {
+    for i in 0..self.len {
+      self[i] = val;
+    }
+  }
 }
 
 impl<T> fmt::Display for HeapAllocatedArray<T>
