@@ -9,30 +9,35 @@ pub type HashType = u32;
 pub struct LSH {
   data: HeapAllocatedArray<IDType>,
   tables: usize,
-  _rows: usize,
+  rows: usize,
   reservoir_size: usize,
   row_size: usize,
   table_size: usize,
-  rng: rand::rngs::ThreadRng,
+  rand_values: HeapAllocatedArray<usize>,
 }
 
-// TODO: Precompute random values
-
 impl LSH {
-  fn new(tables: usize, rows: usize, reservoir_size: usize) -> Self {
+  fn new(tables: usize, range_pow: usize, reservoir_size: usize) -> Self {
+    let mut rng = thread_rng();
+    let mut rand_values = HeapAllocatedArray::new(reservoir_size * 20);
+    for i in 1..reservoir_size * 20 {
+      rand_values[i] = rng.gen::<usize>() % i;
+    }
+
+    let rows = 1 << range_pow;
     let mut lsh = LSH {
       data: HeapAllocatedArray::with_value(tables * rows * (reservoir_size + 1), IDType::MAX),
       tables,
-      _rows: rows,
+      rows: rows,
       reservoir_size,
       row_size: reservoir_size + 1,
       table_size: rows * (reservoir_size + 1),
-      rng: thread_rng(),
+      rand_values,
     };
 
     for t in 0..tables {
       for r in 0..rows {
-        lsh.data[t * lsh.row_size + r * lsh.row_size] = 0;
+        lsh.data[t * lsh.table_size + r * lsh.row_size] = 0;
       }
     }
 
@@ -52,7 +57,7 @@ impl LSH {
         if count < self.reservoir_size {
           self.data[offset + count + 1] = id;
         } else {
-          let r = self.rng.gen::<usize>() % count;
+          let r = self.rand_values[count];
           if r < self.row_size {
             self.data[offset + 1 + r] = id;
           }
@@ -100,5 +105,64 @@ impl LSH {
     }
 
     return result;
+  }
+
+  fn override_rand_values(&mut self, vals: &[usize]) {
+    for i in 0..self.reservoir_size * 20 {
+      self.rand_values[i] = vals[i];
+    }
+  }
+}
+
+impl std::fmt::Display for LSH {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    for t in 0..self.tables {
+      write!(f, "Table: {}\n", t)?;
+      for r in 0..self.rows {
+        let start = t * self.table_size + r * self.row_size;
+        write!(f, "    Row {}[{}]: ", r, self.data[start])?;
+        for i in 1..(self.data[start] + 1) as usize {
+          write!(f, "{} ", self.data[start + i])?;
+        }
+        write!(f, "\n")?;
+      }
+      write!(f, "\n")?;
+    }
+
+    Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn do_simple_insert() -> LSH {
+    let ids = [1, 2, 3, 4];
+    let hashes = [0, 0, 1, 2, 2, 1, 0, 3, 3, 0, 0, 3, 2, 3, 0, 3];
+
+    let mut lsh = LSH::new(4, 2, 4);
+
+    lsh.insert(&ids, &hashes);
+
+    return lsh;
+  }
+
+  #[test]
+  fn test_simple_insert() {
+    let lsh = do_simple_insert();
+
+    let xx = IDType::MAX;
+
+    let expected = [
+      1, 1, xx, xx, xx, 0, xx, xx, xx, xx, 2, 2, 4, xx, xx, 1, 3, xx, xx, xx, 2, 1, 3, xx, xx, 1,
+      2, xx, xx, xx, 0, xx, xx, xx, xx, 1, 4, xx, xx, xx, 3, 2, 3, 4, xx, 1, 1, xx, xx, xx, 0, xx,
+      xx, xx, xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 1, 1, xx, xx, xx, 3, 2,
+      3, 4, xx,
+    ];
+
+    for i in 0..80 {
+      assert_eq!(lsh.data[i], expected[i]);
+    }
   }
 }
