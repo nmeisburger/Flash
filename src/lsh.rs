@@ -242,16 +242,16 @@ mod tests {
     }
   }
 
-  #[test]
-  fn test_query() {
-    let mut lsh = do_simple_insert();
+  // #[test]
+  // fn test_query() {
+  //   let mut lsh = do_simple_insert();
 
-    do_second_insert(&mut lsh);
+  //   do_second_insert(&mut lsh);
 
-    println!("{}", lsh);
+  //   println!("{}", lsh);
 
-    // let hashes = [0,2, ]
+  //   // let hashes = [0,2, ]
 
-    assert!(false);
-  }
+  //   assert!(false);
+  // }
 }
