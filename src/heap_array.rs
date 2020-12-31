@@ -94,8 +94,6 @@ impl<T> Drop for HeapAllocatedArray<T> {
     unsafe {
       dealloc(self.ptr.ptr() as *mut u8, self.layout);
     }
-
-    println!("called drop")
   }
 }
 

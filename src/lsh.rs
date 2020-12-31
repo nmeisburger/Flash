@@ -2,6 +2,7 @@ use crate::heap_array::HeapAllocatedArray;
 
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub type IDType = u32;
 pub type HashType = u32;
@@ -14,6 +15,49 @@ pub struct LSH {
   row_size: usize,
   table_size: usize,
   rand_values: HeapAllocatedArray<usize>,
+}
+
+pub struct QueryResult {
+  results: Rc<HeapAllocatedArray<IDType>>,
+  num: usize,
+  k: usize,
+}
+
+impl QueryResult {
+  fn new(results: HeapAllocatedArray<IDType>, num: usize, k: usize) -> Self {
+    QueryResult {
+      results: Rc::new(results),
+      num,
+      k,
+    }
+  }
+
+  fn nth(&self, idx: usize) -> ResultIter {
+    let start = self.results[idx * (self.k + 1)] as usize;
+    ResultIter {
+      results: Rc::clone(&self.results),
+      curr: start,
+      end: start + (self.results[start] as usize) - 1,
+    }
+  }
+}
+
+struct ResultIter {
+  results: Rc<HeapAllocatedArray<IDType>>,
+  curr: usize,
+  end: usize,
+}
+
+impl Iterator for ResultIter {
+  type Item = IDType;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.curr >= self.end {
+      return None;
+    }
+    self.curr += 1;
+    return Some(self.results[self.curr]);
+  }
 }
 
 impl LSH {
@@ -58,7 +102,7 @@ impl LSH {
           self.data[offset + count + 1] = id;
         } else {
           let r = self.rand_values[count];
-          if r < self.row_size {
+          if r < self.reservoir_size {
             self.data[offset + 1 + r] = id;
           }
         }
@@ -66,7 +110,7 @@ impl LSH {
     }
   }
 
-  fn query(&self, hashes: &[HashType], k: usize) -> HeapAllocatedArray<IDType> {
+  fn query(&self, hashes: &[HashType], k: usize) -> QueryResult {
     let num_query = hashes.len() / self.tables;
     let mut result: HeapAllocatedArray<IDType> =
       HeapAllocatedArray::with_default(num_query * (k + 1));
@@ -104,7 +148,7 @@ impl LSH {
       }
     }
 
-    return result;
+    return QueryResult::new(result, num_query, k);
   }
 
   fn override_rand_values(&mut self, vals: &[usize]) {
@@ -121,7 +165,7 @@ impl std::fmt::Display for LSH {
       for r in 0..self.rows {
         let start = t * self.table_size + r * self.row_size;
         write!(f, "    Row {}[{}]: ", r, self.data[start])?;
-        for i in 1..(self.data[start] + 1) as usize {
+        for i in 1..(std::cmp::min(self.data[start] as usize, self.reservoir_size) + 1) {
           write!(f, "{} ", self.data[start + i])?;
         }
         write!(f, "\n")?;
@@ -139,13 +183,26 @@ mod tests {
 
   fn do_simple_insert() -> LSH {
     let ids = [1, 2, 3, 4];
-    let hashes = [0, 0, 1, 2, 2, 1, 0, 3, 3, 0, 0, 3, 2, 3, 0, 3];
+    let hashes = [0, 0, 1, 3, 2, 1, 0, 2, 3, 0, 0, 3, 2, 3, 0, 3];
 
     let mut lsh = LSH::new(4, 2, 4);
 
     lsh.insert(&ids, &hashes);
 
     return lsh;
+  }
+
+  fn do_second_insert(lsh: &mut LSH) {
+    let mut new_rands = [15; 80];
+
+    new_rands[5] = 2;
+
+    lsh.override_rand_values(&new_rands);
+
+    let ids = [5, 6, 7];
+    let hashes = [2, 1, 0, 1, 0, 2, 0, 3, 2, 3, 0, 3];
+
+    lsh.insert(&ids, &hashes);
   }
 
   #[test]
@@ -157,12 +214,44 @@ mod tests {
     let expected = [
       1, 1, xx, xx, xx, 0, xx, xx, xx, xx, 2, 2, 4, xx, xx, 1, 3, xx, xx, xx, 2, 1, 3, xx, xx, 1,
       2, xx, xx, xx, 0, xx, xx, xx, xx, 1, 4, xx, xx, xx, 3, 2, 3, 4, xx, 1, 1, xx, xx, xx, 0, xx,
-      xx, xx, xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 1, 1, xx, xx, xx, 3, 2,
+      xx, xx, xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 1, 2, xx, xx, xx, 3, 1,
       3, 4, xx,
     ];
 
     for i in 0..80 {
       assert_eq!(lsh.data[i], expected[i]);
     }
+  }
+
+  #[test]
+  fn test_reservoir_overflow() {
+    let mut lsh = do_simple_insert();
+
+    do_second_insert(&mut lsh);
+
+    let xx = IDType::MAX;
+
+    let expected = [
+      2, 1, 6, xx, xx, 0, xx, xx, xx, xx, 4, 2, 4, 5, 7, 1, 3, xx, xx, xx, 2, 1, 3, xx, xx, 2, 2,
+      5, xx, xx, 1, 6, xx, xx, xx, 2, 4, 7, xx, xx, 6, 2, 3, 7, 5, 1, 1, xx, xx, xx, 0, xx, xx, xx,
+      xx, 0, xx, xx, xx, xx, 0, xx, xx, xx, xx, 1, 5, xx, xx, xx, 1, 2, xx, xx, xx, 5, 1, 3, 4, 6,
+    ];
+
+    for i in 0..80 {
+      assert_eq!(lsh.data[i], expected[i]);
+    }
+  }
+
+  #[test]
+  fn test_query() {
+    let mut lsh = do_simple_insert();
+
+    do_second_insert(&mut lsh);
+
+    println!("{}", lsh);
+
+    // let hashes = [0,2, ]
+
+    assert!(false);
   }
 }
