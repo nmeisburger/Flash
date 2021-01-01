@@ -19,26 +19,34 @@ pub struct LSH {
 
 pub struct QueryResult {
   results: Rc<HeapAllocatedArray<IDType>>,
-  num: usize,
+  len: usize,
   k: usize,
 }
 
 impl QueryResult {
-  fn new(results: HeapAllocatedArray<IDType>, num: usize, k: usize) -> Self {
+  fn new(results: HeapAllocatedArray<IDType>, len: usize, k: usize) -> Self {
     QueryResult {
       results: Rc::new(results),
-      num,
+      len,
       k,
     }
   }
 
   fn nth(&self, idx: usize) -> ResultIter {
-    let start = self.results[idx * (self.k + 1)] as usize;
+    let start = idx * (self.k + 1);
     ResultIter {
       results: Rc::clone(&self.results),
       curr: start,
-      end: start + (self.results[start] as usize) - 1,
+      end: start + (self.results[start] as usize),
     }
+  }
+
+  fn len(&self) -> usize {
+    self.len
+  }
+
+  fn count(&self, idx: usize) -> usize {
+    self.results[idx * (self.k + 1)] as usize
   }
 }
 
@@ -122,8 +130,7 @@ impl LSH {
       for t in 0..self.tables {
         let hash = hashes[q * self.tables + t] as usize;
         let offset = t * self.table_size + hash * self.row_size;
-        let count = self.data[offset] as usize;
-
+        let count = std::cmp::min(self.data[offset] as usize, self.reservoir_size);
         for i in 1..count + 1 {
           let id = self.data[offset + i];
           match counts.get(&id) {
@@ -180,6 +187,34 @@ impl std::fmt::Display for LSH {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn test_query_result() {
+    let data = [3, 8, 9, 2, 0, 0, 1, 1, 1, 1, 4, 90, 91, 92, 93];
+    let mut arr = HeapAllocatedArray::new(15);
+    for i in 0..15 {
+      arr[i] = data[i];
+    }
+    let res = QueryResult::new(arr, 3, 4);
+
+    let ex1 = vec![8, 9, 2];
+    for (i, x) in res.nth(0).enumerate() {
+      assert_eq!(ex1[i], x);
+    }
+    assert_eq!(res.count(0), 3);
+
+    let ex2: Vec<IDType> = vec![];
+    for (i, x) in res.nth(1).enumerate() {
+      assert_eq!(ex2[i], x);
+    }
+    assert_eq!(res.count(1), 0);
+
+    let ex3 = vec![90, 91, 92, 93];
+    for (i, x) in res.nth(2).enumerate() {
+      assert_eq!(ex3[i], x);
+    }
+    assert_eq!(res.count(2), 4);
+  }
 
   fn do_simple_insert() -> LSH {
     let ids = [1, 2, 3, 4];
@@ -242,16 +277,32 @@ mod tests {
     }
   }
 
-  // #[test]
-  // fn test_query() {
-  //   let mut lsh = do_simple_insert();
+  #[test]
+  fn test_query() {
+    let mut lsh = do_simple_insert();
 
-  //   do_second_insert(&mut lsh);
+    do_second_insert(&mut lsh);
 
-  //   println!("{}", lsh);
+    println!("{}", lsh);
 
-  //   // let hashes = [0,2, ]
+    let hashes = [0, 2, 3, 3, 1, 1, 2, 1, 1, 2, 2, 0];
+    let result = lsh.query(&hashes, 4);
 
-  //   assert!(false);
-  // }
+    let result1: Vec<IDType> = result.nth(0).collect();
+    let match1 = result1[0] == 6
+      && result1[1] == 1
+      && ((result1[2] == 4 && result1[3] == 3) || (result1[2] == 3 && result1[3] == 4));
+    assert!(match1);
+    assert_eq!(result.count(0), 4);
+
+    let result2: Vec<IDType> = result.nth(1).collect();
+    let match2 = result2[0] == 5 && result2[1] == 2;
+    assert!(match2);
+    assert_eq!(result.count(1), 2);
+
+    let result3: Vec<IDType> = result.nth(2).collect();
+    let match3 = result3[0] == 6;
+    assert!(match3);
+    assert_eq!(result.count(2), 1);
+  }
 }
