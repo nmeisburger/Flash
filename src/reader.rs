@@ -14,6 +14,19 @@ impl Data {
   }
 }
 
+pub struct FullData {
+  pub markers: Vec<usize>,
+  pub indices: Vec<HashType>,
+  pub values: Vec<f32>,
+  len: usize,
+}
+
+impl FullData {
+  pub fn len(&self) -> usize {
+    self.len
+  }
+}
+
 pub fn partition(total_len: usize, num: usize) -> Vec<usize> {
   let base = total_len / num;
   let rmdr = total_len % num;
@@ -23,13 +36,14 @@ pub fn partition(total_len: usize, num: usize) -> Vec<usize> {
     .collect()
 }
 
-pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) -> Data {
+pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) -> FullData {
   let input = File::open(filename).expect("File should open");
 
   let reader = BufReader::new(input);
 
   let mut markers: Vec<usize> = Vec::with_capacity(num_lines + 1);
-  let mut indices: Vec<HashType> = Vec::with_capacity((num_lines) * avg_dim);
+  let mut indices: Vec<HashType> = Vec::with_capacity(num_lines * avg_dim);
+  let mut values: Vec<f32> = Vec::with_capacity(num_lines * avg_dim);
   let mut lines_read = 0;
 
   markers.push(0);
@@ -37,21 +51,12 @@ pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) 
   for line in reader.lines().skip(skip) {
     match line {
       Ok(s) => {
-        let chars = s.chars();
-        let mut curr_val: HashType = 0;
-        let mut at_val: bool = false;
-        for c in chars {
-          if c == ' ' {
-            at_val = true;
-          } else if c == ':' {
-            at_val = false;
-            indices.push(curr_val);
-            curr_val = 0;
-          } else if at_val {
-            curr_val *= 10;
-            curr_val += ((c as u8) - ('0' as u8)) as HashType
-          }
+        for pair in s.split(' ').skip(1) {
+          let i = pair.find(':').expect("Pair should have ':'");
+          indices.push(pair[..i].parse::<HashType>().expect("Should be integer"));
+          values.push(pair[i + 1..].parse::<f32>().expect("Should be float"));
         }
+        markers.push(indices.len());
       }
       Err(_) => panic!("Error reading file '{}'", filename),
     }
@@ -63,9 +68,10 @@ pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) 
     }
   }
 
-  return Data {
+  return FullData {
     markers,
     indices,
+    values,
     len: num_lines,
   };
 }
