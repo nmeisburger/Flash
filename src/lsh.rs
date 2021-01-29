@@ -69,7 +69,7 @@ impl Iterator for ResultIter {
 }
 
 impl LSH {
-  fn new(tables: usize, range_pow: usize, reservoir_size: usize) -> Self {
+  pub fn new(tables: usize, range_pow: usize, reservoir_size: usize) -> Self {
     let mut rng = thread_rng();
     let mut rand_values = HeapAllocatedArray::new(reservoir_size * 20);
     for i in 1..reservoir_size * 20 {
@@ -96,7 +96,7 @@ impl LSH {
     return lsh;
   }
 
-  fn insert(&mut self, ids: &[IDType], hashes: &[HashType]) {
+  pub fn insert(&mut self, ids: &[IDType], hashes: &[HashType]) {
     for n in 0..ids.len() {
       let id = ids[n];
 
@@ -118,7 +118,29 @@ impl LSH {
     }
   }
 
-  fn query(&self, hashes: &[HashType], k: usize) -> QueryResult {
+  pub fn insert_range(&mut self, id_start: IDType, count: usize, hashes: &[HashType]) {
+    for n in 0..count {
+      let id = id_start + count as IDType;
+
+      for t in 0..self.tables {
+        let hash = hashes[n * self.tables + t] as usize;
+        let offset = t * self.table_size + hash * self.row_size;
+        let count = self.data[offset] as usize;
+
+        self.data[offset] += 1;
+        if count < self.reservoir_size {
+          self.data[offset + count + 1] = id;
+        } else {
+          let r = self.rand_values[count];
+          if r < self.reservoir_size {
+            self.data[offset + 1 + r] = id;
+          }
+        }
+      }
+    }
+  }
+
+  pub fn query(&self, hashes: &[HashType], k: usize) -> QueryResult {
     let num_query = hashes.len() / self.tables;
     let mut result: HeapAllocatedArray<IDType> =
       HeapAllocatedArray::with_default(num_query * (k + 1));

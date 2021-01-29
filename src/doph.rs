@@ -1,12 +1,12 @@
 use crate::heap_array::HeapAllocatedArray;
 use crate::lsh::HashType;
-use crate::reader::Data;
+use crate::reader::FullData;
 
 use rand::{thread_rng, Rng};
 
 const MAX_DENSIFY_RETRY: HashType = 100;
 
-struct DOPH {
+pub struct DOPH {
   k: usize,
   l: usize,
   num_hashes: usize,
@@ -20,7 +20,7 @@ struct DOPH {
 }
 
 impl DOPH {
-  pub fn new(l: usize, k: usize, rp: HashType) -> DOPH {
+  pub fn new(l: usize, k: usize, range_pow: HashType) -> DOPH {
     let num_hashes = k * l;
 
     let mut log_num_hash = 1;
@@ -39,16 +39,16 @@ impl DOPH {
       k: k,
       l: l,
       num_hashes: num_hashes,
-      range_pow: rp,
+      range_pow: range_pow,
       log_num_hash: log_num_hash,
-      binsize: (1 << rp) / ((num_hashes) as HashType),
+      binsize: (1 << range_pow) / ((num_hashes) as HashType),
       seeds: seeds,
       randa: rng.gen(),
       randb: rng.gen(),
     }
   }
 
-  pub fn hash(&self, data: Data) -> HeapAllocatedArray<HashType> {
+  pub fn hash(&self, data: FullData) -> HeapAllocatedArray<HashType> {
     let mut hashes_indices = HeapAllocatedArray::with_default(self.l * data.len());
 
     let mut hashes: HeapAllocatedArray<HashType> = HeapAllocatedArray::new(self.num_hashes);
