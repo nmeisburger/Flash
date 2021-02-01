@@ -1,6 +1,6 @@
 use crate::heap_array::HeapAllocatedArray;
 use crate::lsh::HashType;
-use crate::reader::FullData;
+use crate::reader::Data;
 
 use rand::{thread_rng, Rng};
 
@@ -48,7 +48,7 @@ impl DOPH {
     }
   }
 
-  pub fn hash(&self, data: FullData) -> HeapAllocatedArray<HashType> {
+  pub fn hash(&self, data: Data) -> HeapAllocatedArray<HashType> {
     let mut hashes_indices = HeapAllocatedArray::with_default(self.l * data.len());
 
     let mut hashes: HeapAllocatedArray<HashType> = HeapAllocatedArray::new(self.num_hashes);

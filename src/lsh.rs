@@ -120,7 +120,7 @@ impl LSH {
 
   pub fn insert_range(&mut self, id_start: IDType, count: usize, hashes: &[HashType]) {
     for n in 0..count {
-      let id = id_start + count as IDType;
+      let id = id_start + n as IDType;
 
       for t in 0..self.tables {
         let hash = hashes[n * self.tables + t] as usize;
@@ -326,5 +326,23 @@ mod tests {
     let match3 = result3[0] == 6;
     assert!(match3);
     assert_eq!(result.count(2), 1);
+  }
+
+  #[test]
+  fn test_insert_range() {
+    let ids = [1, 2, 3, 4];
+    let hashes = [0, 0, 1, 3, 2, 1, 0, 2, 3, 0, 0, 3, 2, 3, 0, 3];
+
+    let mut lsh1 = LSH::new(4, 2, 4);
+
+    lsh1.insert(&ids, &hashes);
+
+    let mut lsh2 = LSH::new(4, 2, 4);
+
+    lsh2.insert_range(1, 4, &hashes);
+
+    for i in 0..lsh1.data.len() {
+      assert_eq!(lsh1.data[i], lsh2.data[i]);
+    }
   }
 }

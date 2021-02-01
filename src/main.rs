@@ -12,7 +12,7 @@ mod thread_pool;
 use config::{Config, DataConfig, LSHConfig};
 use doph::DOPH;
 use lsh::{HashType, LSH};
-use reader::read_file;
+use reader::read_data_svm;
 
 use std::env;
 
@@ -49,7 +49,7 @@ fn main() {
     }
   };
 
-  let data = read_file(
+  let data = read_data_svm(
     config.data.filename,
     config.data.num_data,
     config.data.avg_dim,
@@ -72,7 +72,7 @@ fn main() {
 
   lsh.insert_range(0, config.data.num_data, &hashes);
 
-  let query = read_file(
+  let query = read_data_svm(
     config.data.filename,
     config.data.num_query,
     config.data.avg_dim,

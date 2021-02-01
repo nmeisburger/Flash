@@ -5,23 +5,11 @@ use std::io::{BufRead, BufReader};
 pub struct Data {
   pub markers: Vec<usize>,
   pub indices: Vec<HashType>,
-  len: usize,
-}
-
-impl Data {
-  pub fn len(&self) -> usize {
-    self.len
-  }
-}
-
-pub struct FullData {
-  pub markers: Vec<usize>,
-  pub indices: Vec<HashType>,
   pub values: Vec<f32>,
   len: usize,
 }
 
-impl FullData {
+impl Data {
   pub fn len(&self) -> usize {
     self.len
   }
@@ -36,7 +24,7 @@ pub fn partition(total_len: usize, num: usize) -> Vec<usize> {
     .collect()
 }
 
-pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) -> FullData {
+pub fn read_data_svm(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) -> Data {
   let input = File::open(filename).expect("File should open");
 
   let reader = BufReader::new(input);
@@ -68,7 +56,7 @@ pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) 
     }
   }
 
-  return FullData {
+  return Data {
     markers,
     indices,
     values,
@@ -76,9 +64,10 @@ pub fn read_file(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) 
   };
 }
 
-pub fn read_file_partitioned(
+pub fn read_data_svm_partitioned(
   filename: &str,
-  parition_lens: &[usize],
+  total_len: usize,
+  num_partitions: usize,
   avg_dim: usize,
   skip: usize,
 ) -> Vec<Data> {
@@ -86,33 +75,26 @@ pub fn read_file_partitioned(
 
   let reader = BufReader::new(input);
 
-  let mut results = Vec::with_capacity(parition_lens.len());
+  let partition_lens = partition(total_len, num_partitions);
 
-  let mut curr_len = parition_lens[0];
+  let mut results = Vec::with_capacity(num_partitions);
+
+  let mut curr_len = partition_lens[0];
   let mut idx = 0;
   let mut lines_read = 0;
 
   let mut markers: Vec<usize> = Vec::with_capacity(curr_len + 1);
   markers.push(0);
-  let mut indices: Vec<HashType> = Vec::with_capacity((curr_len) * avg_dim);
+  let mut indices: Vec<HashType> = Vec::with_capacity(curr_len * avg_dim);
+  let mut values: Vec<f32> = Vec::with_capacity(curr_len * avg_dim);
 
   for line in reader.lines().skip(skip) {
     match line {
       Ok(s) => {
-        let chars = s.chars();
-        let mut curr_val: HashType = 0;
-        let mut at_val: bool = false;
-        for c in chars {
-          if c == ' ' {
-            at_val = true;
-          } else if c == ':' {
-            at_val = false;
-            indices.push(curr_val);
-            curr_val = 0;
-          } else if at_val {
-            curr_val *= 10;
-            curr_val += ((c as u8) - ('0' as u8)) as HashType
-          }
+        for pair in s.split(' ').skip(1) {
+          let i = pair.find(':').expect("Pair should have ':'");
+          indices.push(pair[..i].parse::<HashType>().expect("Should be integer"));
+          values.push(pair[i + 1..].parse::<f32>().expect("Should be float"));
         }
       }
       Err(_) => panic!("Error reading file '{}'", filename),
@@ -124,18 +106,20 @@ pub fn read_file_partitioned(
       results.push(Data {
         indices,
         markers,
+        values: values,
         len: curr_len,
       });
       idx += 1;
-      if idx >= parition_lens.len() {
+      if idx >= num_partitions {
         break;
       }
-      curr_len = parition_lens[idx];
+      curr_len = partition_lens[idx];
       lines_read = 0;
 
       markers = Vec::with_capacity(curr_len + 1);
       markers.push(0);
-      indices = Vec::with_capacity((curr_len) * avg_dim);
+      indices = Vec::with_capacity(curr_len * avg_dim);
+      values = Vec::with_capacity(curr_len * avg_dim);
     }
   }
 
