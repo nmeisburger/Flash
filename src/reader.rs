@@ -48,7 +48,6 @@ pub fn read_data_svm(filename: &str, num_lines: usize, avg_dim: usize, skip: usi
       }
       Err(_) => panic!("Error reading file '{}'", filename),
     }
-    markers.push(indices.len());
 
     lines_read += 1;
     if lines_read >= num_lines {
@@ -96,10 +95,10 @@ pub fn read_data_svm_partitioned(
           indices.push(pair[..i].parse::<HashType>().expect("Should be integer"));
           values.push(pair[i + 1..].parse::<f32>().expect("Should be float"));
         }
+        markers.push(indices.len());
       }
       Err(_) => panic!("Error reading file '{}'", filename),
     }
-    markers.push(indices.len());
 
     lines_read += 1;
     if lines_read >= curr_len {
@@ -124,4 +123,84 @@ pub fn read_data_svm_partitioned(
   }
 
   return results;
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::io::prelude::Write;
+
+  fn create_and_write_data(filename: &str) {
+    let mut file = File::create(filename).expect("Should be able to open file for test");
+
+    file
+      .write(b"1 3:9.125 11:0.5 321:-0.125\n0 2:2.0 17:-1.5 18:-45 33:-1\n1 88:-1 91:0 120:-0 18223:-2.125\n1 4:-0.5\n0 177:-83.5 12:56.25")
+      .expect("write should succeed");
+  }
+
+  #[test]
+  fn test_read_svm() {
+    let filename = "./temp_reader_test_file";
+
+    create_and_write_data(filename);
+
+    let data = read_data_svm(filename, 5, 3, 0);
+
+    let markers = vec![0, 3, 7, 11, 12, 14];
+    let indices = vec![3, 11, 321, 2, 17, 18, 33, 88, 91, 120, 18223, 4, 177, 12];
+    let values = vec![
+      9.125, 0.5, -0.125, 2.0, -1.5, -45.0, -1.0, -1.0, 0.0, 0.0, -2.125, -0.5, -83.5, 56.25,
+    ];
+
+    assert_eq!(data.len(), 5);
+    assert_eq!(data.markers.len(), markers.len());
+    assert_eq!(data.indices.len(), indices.len());
+    assert_eq!(data.values.len(), values.len());
+
+    for (i, &v) in data.markers.iter().enumerate() {
+      assert_eq!(v, markers[i]);
+    }
+
+    for (i, &v) in data.indices.iter().enumerate() {
+      assert_eq!(v, indices[i]);
+    }
+
+    for (i, &v) in data.values.iter().enumerate() {
+      assert_eq!(v, values[i]);
+    }
+
+    std::fs::remove_file(filename).expect("Shoudl be able to delete file after test");
+  }
+
+  #[test]
+  fn test_read_svm_with_skip() {
+    let filename = "./temp_reader_test_file";
+
+    create_and_write_data(filename);
+
+    let data = read_data_svm(filename, 3, 3, 2);
+
+    let markers = vec![0, 4, 5, 7];
+    let indices = vec![88, 91, 120, 18223, 4, 177, 12];
+    let values = vec![-1.0, 0.0, 0.0, -2.125, -0.5, -83.5, 56.25];
+
+    assert_eq!(data.len(), 3);
+    assert_eq!(data.markers.len(), markers.len());
+    assert_eq!(data.indices.len(), indices.len());
+    assert_eq!(data.values.len(), values.len());
+
+    for (i, &v) in data.markers.iter().enumerate() {
+      assert_eq!(v, markers[i]);
+    }
+
+    for (i, &v) in data.indices.iter().enumerate() {
+      assert_eq!(v, indices[i]);
+    }
+
+    for (i, &v) in data.values.iter().enumerate() {
+      assert_eq!(v, values[i]);
+    }
+
+    std::fs::remove_file(filename).expect("Shoudl be able to delete file after test");
+  }
 }
