@@ -9,9 +9,59 @@ pub struct Data {
   len: usize,
 }
 
+pub struct DataVecIter<'a> {
+  data: &'a Data,
+  at: usize,
+  stop: usize,
+}
+
+impl<'a> Iterator for DataVecIter<'a> {
+  type Item = (HashType, f32);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.at >= self.stop {
+      return None;
+    }
+    let i = self.at;
+    self.at += 1;
+    return Some((self.data.indices[i], self.data.values[i]));
+  }
+}
+
+pub struct DataIter<'a> {
+  data: &'a Data,
+  vec: usize,
+}
+
+impl<'a> Iterator for DataIter<'a> {
+  type Item = DataVecIter<'a>;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.vec >= self.data.len() {
+      return None;
+    }
+
+    let v = self.vec;
+    self.vec += 1;
+
+    return Some(DataVecIter {
+      data: self.data,
+      at: self.data.markers[v],
+      stop: self.data.markers[v + 1],
+    });
+  }
+}
+
 impl Data {
   pub fn len(&self) -> usize {
     self.len
+  }
+
+  pub fn iter(&self) -> DataIter {
+    DataIter {
+      data: &self,
+      vec: 0,
+    }
   }
 }
 
@@ -129,6 +179,40 @@ pub fn read_data_svm_partitioned(
 mod tests {
   use super::*;
   use std::io::prelude::Write;
+
+  #[test]
+  fn test_data_iter() {
+    let markers = vec![0, 4, 5, 7];
+    let indices = vec![88, 91, 120, 18223, 4, 177, 12];
+    let values = vec![-1.0, 0.125, 0.0, -2.125, -0.5, -83.5, 56.25];
+
+    let data = Data {
+      markers,
+      indices,
+      values,
+      len: 3,
+    };
+
+    let expected = vec![
+      vec![(88, -1.0), (91, 0.125), (120, 0.0), (18223, -2.125)],
+      vec![(4, -0.5)],
+      vec![(177, -83.5), (12, 56.25)],
+    ];
+
+    let counts = vec![4, 1, 2];
+
+    let mut vec_idx = 0;
+    for x in data.iter() {
+      let mut offset_idx = 0;
+      for (i, v) in x {
+        assert_eq!(i, expected[vec_idx][offset_idx].0);
+        assert_eq!(v, expected[vec_idx][offset_idx].1);
+        offset_idx += 1;
+      }
+      assert_eq!(offset_idx, counts[vec_idx]);
+      vec_idx += 1;
+    }
+  }
 
   fn create_and_write_data(filename: &str) {
     let mut file = File::create(filename).expect("Should be able to open file for test");

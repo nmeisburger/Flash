@@ -86,7 +86,7 @@ impl DOPH {
           next = min_hashes[idx as usize];
           if cnt >= MAX_DENSIFY_RETRY {
             next = 0; // TODO: Default value?
-            println!("Densification Failure");
+            eprintln!("Densification Failure");
             break;
           }
         }
