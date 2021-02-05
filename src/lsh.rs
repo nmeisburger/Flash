@@ -2,7 +2,6 @@ use crate::heap_array::HeapAllocatedArray;
 
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
-use std::rc::Rc;
 
 pub type IDType = u32;
 pub type HashType = u32;
@@ -18,7 +17,7 @@ pub struct LSH {
 }
 
 pub struct QueryResult {
-  results: Rc<HeapAllocatedArray<IDType>>,
+  results: HeapAllocatedArray<IDType>,
   len: usize,
   k: usize,
 }
@@ -26,16 +25,16 @@ pub struct QueryResult {
 impl QueryResult {
   fn new(results: HeapAllocatedArray<IDType>, len: usize, k: usize) -> Self {
     QueryResult {
-      results: Rc::new(results),
+      results: results,
       len,
       k,
     }
   }
 
-  fn nth(&self, idx: usize) -> ResultIter {
+  pub fn nth(&self, idx: usize) -> ResultIter {
     let start = idx * (self.k + 1);
     ResultIter {
-      results: Rc::clone(&self.results),
+      results: &self.results,
       curr: start,
       end: start + (self.results[start] as usize),
     }
@@ -50,13 +49,13 @@ impl QueryResult {
   }
 }
 
-struct ResultIter {
-  results: Rc<HeapAllocatedArray<IDType>>,
+pub struct ResultIter<'a> {
+  results: &'a HeapAllocatedArray<IDType>,
   curr: usize,
   end: usize,
 }
 
-impl Iterator for ResultIter {
+impl<'a> Iterator for ResultIter<'a> {
   type Item = IDType;
 
   fn next(&mut self) -> Option<Self::Item> {

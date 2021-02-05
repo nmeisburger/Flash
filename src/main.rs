@@ -1,6 +1,8 @@
 mod config;
 mod doph;
 #[allow(dead_code)]
+mod evaluate;
+#[allow(dead_code)]
 mod heap_array;
 #[allow(dead_code)]
 mod lsh;
@@ -11,7 +13,8 @@ mod thread_pool;
 
 use config::{Config, DataConfig, LSHConfig};
 use doph::DOPH;
-use lsh::{HashType, LSH};
+use evaluate::average_cosine_similarity;
+use lsh::{HashType, IDType, LSH};
 use reader::read_data_svm;
 
 use std::env;
@@ -32,6 +35,7 @@ const TEST_CONFIG: Config = Config {
   },
 
   topk: 0,
+  simk: 0,
 };
 
 fn main() {
@@ -70,7 +74,11 @@ fn main() {
 
   let hashes = doph.hash(data);
 
-  lsh.insert_range(0, config.data.num_data, &hashes);
+  lsh.insert_range(
+    config.data.num_query as IDType,
+    config.data.num_data,
+    &hashes,
+  );
 
   let query = read_data_svm(
     config.data.filename,
@@ -81,5 +89,16 @@ fn main() {
 
   let query_hashes = doph.hash(query);
 
-  let _results = lsh.query(&query_hashes, config.topk);
+  let results = lsh.query(&query_hashes, config.topk);
+
+  let all_data = read_data_svm(
+    config.data.filename,
+    config.data.num_data + config.data.num_query,
+    config.data.avg_dim,
+    0,
+  );
+
+  let sim = average_cosine_similarity(0, config.data.num_query, results, &all_data, config.simk);
+
+  println!("Average cosine similarity @{} is {}", config.simk, sim);
 }

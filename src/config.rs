@@ -16,4 +16,5 @@ pub struct Config {
   pub lsh: LSHConfig,
   pub data: DataConfig,
   pub topk: usize,
+  pub simk: usize,
 }

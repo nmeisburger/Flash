@@ -1,8 +1,9 @@
 use crate::heap_array::HeapAllocatedArray;
 use crate::lsh::HashType;
-use crate::reader::Data;
+use crate::reader::SVMData;
 
 use rand::{thread_rng, Rng};
+// use std::num::Wrapping;
 
 const MAX_DENSIFY_RETRY: HashType = 100;
 
@@ -48,7 +49,7 @@ impl DOPH {
     }
   }
 
-  pub fn hash(&self, data: Data) -> HeapAllocatedArray<HashType> {
+  pub fn hash(&self, data: SVMData) -> HeapAllocatedArray<HashType> {
     let mut hashes_indices = HeapAllocatedArray::with_default(self.l * data.len());
 
     let mut hashes: HeapAllocatedArray<HashType> = HeapAllocatedArray::new(self.num_hashes);
@@ -118,3 +119,28 @@ impl DOPH {
     return (self.randb * temp << 3) >> (32 - self.log_num_hash);
   }
 }
+
+// #[cfg(test)]
+// mod tests {
+//   use super::*;
+
+//   #[test]
+//   fn test_doph() {
+//     let markers = vec![0, 4, 5, 7];
+//     let indices = vec![88, 91, 120, 18223, 4, 177, 12];
+//     let values = vec![-1.0, 0.125, 0.0, -2.125, -0.5, -83.5, 56.25];
+
+//     let data = SVMData {
+//       markers,
+//       indices,
+//       values,
+//       len: 3,
+//     };
+
+//     let doph = DOPH::new(4, 4, 4);
+
+//     let hashes = doph.hash(data);
+
+//     assert_eq!(hashes.len(), 12);
+//   }
+// }

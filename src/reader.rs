@@ -2,15 +2,15 @@ use crate::lsh::HashType;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-pub struct Data {
+pub struct SVMData {
   pub markers: Vec<usize>,
   pub indices: Vec<HashType>,
   pub values: Vec<f32>,
-  len: usize,
+  pub len: usize,
 }
 
 pub struct DataVecIter<'a> {
-  data: &'a Data,
+  data: &'a SVMData,
   at: usize,
   stop: usize,
 }
@@ -29,7 +29,7 @@ impl<'a> Iterator for DataVecIter<'a> {
 }
 
 pub struct DataIter<'a> {
-  data: &'a Data,
+  data: &'a SVMData,
   vec: usize,
 }
 
@@ -52,7 +52,7 @@ impl<'a> Iterator for DataIter<'a> {
   }
 }
 
-impl Data {
+impl SVMData {
   pub fn len(&self) -> usize {
     self.len
   }
@@ -74,7 +74,7 @@ pub fn partition(total_len: usize, num: usize) -> Vec<usize> {
     .collect()
 }
 
-pub fn read_data_svm(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) -> Data {
+pub fn read_data_svm(filename: &str, num_lines: usize, avg_dim: usize, skip: usize) -> SVMData {
   let input = File::open(filename).expect("File should open");
 
   let reader = BufReader::new(input);
@@ -105,7 +105,7 @@ pub fn read_data_svm(filename: &str, num_lines: usize, avg_dim: usize, skip: usi
     }
   }
 
-  return Data {
+  return SVMData {
     markers,
     indices,
     values,
@@ -119,7 +119,7 @@ pub fn read_data_svm_partitioned(
   num_partitions: usize,
   avg_dim: usize,
   skip: usize,
-) -> Vec<Data> {
+) -> Vec<SVMData> {
   let input = File::open(filename).expect("File should open");
 
   let reader = BufReader::new(input);
@@ -152,7 +152,7 @@ pub fn read_data_svm_partitioned(
 
     lines_read += 1;
     if lines_read >= curr_len {
-      results.push(Data {
+      results.push(SVMData {
         indices,
         markers,
         values: values,
@@ -186,7 +186,7 @@ mod tests {
     let indices = vec![88, 91, 120, 18223, 4, 177, 12];
     let values = vec![-1.0, 0.125, 0.0, -2.125, -0.5, -83.5, 56.25];
 
-    let data = Data {
+    let data = SVMData {
       markers,
       indices,
       values,
