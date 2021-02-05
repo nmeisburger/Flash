@@ -53,12 +53,19 @@ fn main() {
     }
   };
 
+  println!(
+    "Reading {} vectors as insertion dataset",
+    config.data.num_data
+  );
+
   let data = read_data_svm(
     config.data.filename,
     config.data.num_data,
     config.data.avg_dim,
     config.data.num_query,
   );
+
+  println!("\t-Done");
 
   let doph = DOPH::new(
     config.lsh.tables,
@@ -72,13 +79,23 @@ fn main() {
     config.lsh.reservoir_size,
   );
 
+  println!("Hashing data");
+
   let hashes = doph.hash(data);
+
+  println!("\t-Done");
+
+  println!("Inserting data");
 
   lsh.insert_range(
     config.data.num_query as IDType,
     config.data.num_data,
     &hashes,
   );
+
+  println!("\t-Done");
+
+  println!("Reading {} vectors as query dataset", config.data.num_query);
 
   let query = read_data_svm(
     config.data.filename,
@@ -87,9 +104,24 @@ fn main() {
     0,
   );
 
+  println!("\t-Done");
+
+  println!("Hashing queries");
+
   let query_hashes = doph.hash(query);
 
+  println!("\t-Done");
+
+  println!("Querying data");
+
   let results = lsh.query(&query_hashes, config.topk);
+
+  println!("\t-Done");
+
+  println!(
+    "Reading all {} vectors for evaluation",
+    config.data.num_data + config.data.num_query
+  );
 
   let all_data = read_data_svm(
     config.data.filename,
@@ -97,6 +129,10 @@ fn main() {
     config.data.avg_dim,
     0,
   );
+
+  println!("\t-Done");
+
+  println!("Computing average cosine similarity");
 
   let sim = average_cosine_similarity(0, config.data.num_query, results, &all_data, config.simk);
 
